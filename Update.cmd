@@ -1,14 +1,15 @@
 @echo off
+echo Script started at %time%
 SETLOCAL ENABLEDELAYEDEXPANSION
 SET UPDFILE=upd.txt
-SET URL="127.0.0.1:90/"
+SET URL="q45:8000/"
 REM SERIALPORT will contain 0 if no display is found
 SET SERIALPORT=0
 
 REM Main start
 call :funcDetectDisplay
-    IF NOT "%SERIALPORT%"=="0" (
-	REM We have found a display
+IF NOT "%SERIALPORT%"=="0" (
+    REM We have found a display
 	call :funcDownloadAndProcessUpd %URL% %CMDFILE%
     )
 goto :eof
@@ -55,36 +56,50 @@ goto :eof
 
 :funcProcessUpdFile
     SET /p COMMAND=<%UPDFILE%
-    IF  "%COMMAND%"=="CLEAR" (
+    IF          "%COMMAND%"=="CLEAR" (
         ECHO Clearing img folder and backup file
         del /F /S /Q img
-        IF EXIST last_%UPDFILE% DEL last_%UPDFILE%
     ) ELSE IF   "%COMMAND%"=="UPDATE" (
-        echo Updating script
-        del /F /S /Q Update.cmd
-        WGET --no-cache "%URL%Update.cmd"
-        goto :eof
+        call :funcUpdateScript
     ) ELSE (
-        echo Image command
-        SET NEW_IMGFILE=%COMMAND%
-        SET LAST_IMGFILE=""
-        IF EXIST last_%UPDFILE% SET /P LAST_IMGFILE=<last_%UPDFILE%
-        IF NOT !NEW_IMGFILE!==!LAST_IMGFILE! (
-            echo Downloading new image
-            IF EXIST img\!NEW_IMGFILE! DEL img\!NEW_IMGFILE!
-            WGET --no-cache -P img "!URL!!NEW_IMGFILE!"
-            IF EXIST img\!NEW_IMGFILE! (
-                call :funcDisplayImage img\!NEW_IMGFILE!
-            )
-        ) ELSE echo Ignoring new image as it is the same as the last one
+        REM Not a command so must be an image update
+        call :funcDownloadAndUpdateNewImage
     )
+goto :eof
+
+
+:funcDownloadAndUpdateNewImage
+echo Image update
+SET LAST_IMGFILE=""
+SET NEW_IMGFILE=""
+SET /p NEW_IMGFILE=<%UPDFILE%
+IF EXIST last_%UPDFILE% SET /P LAST_IMGFILE=<last_%UPDFILE%
+IF NOT "%NEW_IMGFILE%"=="%LAST_IMGFILE%" (
+    echo Downloading new image %NEW_IMGFILE%
+    IF EXIST img\%NEW_IMGFILE% DEL img\%NEW_IMGFILE%
+    WGET --no-cache -P img "%URL%%NEW_IMGFILE%"
+    IF EXIST img\%NEW_IMGFILE% (
+        call :funcDisplayImage img\%NEW_IMGFILE%
+    )
+) ELSE echo Ignoring new image as it is the same as the last one
+goto :eof
+
+:funcUpdateScript
+echo Updating script
+SET SCRIPT=Update.cmd
+SET NEWSCRIPT=Update.new
+IF EXIST %NEWSCRIPT% DEL /F /Q %NEWSCRIPT%
+wget --no-cache -O %NEWSCRIPT% "%URL%%Script%"
+IF EXIST %NEWSCRIPT% (
+    DEL /F /Q %SCRIPT% && RENAME %NEWSCRIPT% %SCRIPT% && EXIT
+)
 goto :eof
 
 :funcDisplayImage
      SET "IMGFILE=%~1"
      echo Displaying file %IMGFILE%
-     call :funcSendDisplayCmd "i %IMGFILE% 0 l a" 
-	 call :funcSendDisplayCmd "di 0"
+     call :funcSendDisplayCmd "i %IMGFILE% 0 l a 0 di 0"
+     IF NOT "%ERRORLEVEL%"=="0" echo Could not download image into display
 goto :eof
 
 
