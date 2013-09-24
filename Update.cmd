@@ -1,4 +1,5 @@
 @echo off
+echo.
 echo Script started at %time%
 SETLOCAL ENABLEDELAYEDEXPANSION
 SET UPDFILE=upd.txt
@@ -14,6 +15,21 @@ IF NOT "%SERIALPORT%"=="0" (
     )
 goto :eof
 REM Main end
+
+
+REM keeping log siye small is not used at the moment
+:funcKeepLogFileSmall
+REM Limit to 3 MB
+IF EXIST "%~1" (
+    SET LOGSIZE=%~z1
+    echo Log size is %LOGSIZE% bytes
+    if %LOGSIZE% GTR 3145728 (
+        echo Log file %~1 too big, deleting log
+        DEL /F /Q %~1
+    )
+)
+exit /b 0
+goto :eof
 
 REM The caller must check %ERRORLEVEL% afterwards
 :funcSendDisplayCmd 
